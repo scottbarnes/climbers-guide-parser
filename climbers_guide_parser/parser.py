@@ -1,6 +1,6 @@
 import re
 import copy
-import locale
+# import locale
 from dataclasses import dataclass
 from typing import List
 import sys
@@ -48,7 +48,7 @@ placeholder = Region("Pending", "Pending")
 
 @dataclass
 class Pass:
-    """ Climbing/hiking p ass. Will be own document in DB. """
+    """ Climbing/hiking pass. Will be own document in DB. """
     name: str = "Pending"
     class_rating: str = "Pending"
     elevation: str = "Pending"
@@ -89,43 +89,41 @@ def pass_parser(tag: Tag) -> Pass:
     """
     Take the bs4 <p> tag holding the pass information, parse it, and return a
     Pass dataclass.
+    Extract the first <i> tag as it has the pass name and elevation, if present.
+    Then use regex and string replacement to extract and remove the class rating,
+    leaving only the description text.
     """
 
     mountain_pass = Pass()
-    # name: str = ""
-    # elevation: str = ""
-    
+
     # Remove the random <a> tags that indicate book page numbers.
     if tag.a:
         tag.a.decompose()
 
-    # Pass name and elevation are the first italics.
+    # Process any pass names or elevations (first italics, if present.)
     if tag.i:
         name_and_elevation: Tag = tag.i.extract()  # Removes <i> from <p> contents.
         name_and_elevation_str: str = name_and_elevation.string.extract()
-        pattern = re.compile("\((.+)\)")
+        pattern = re.compile(r"\((.+)\)")  # Match up to first "(", where elevation starts.
         match = pattern.search(name_and_elevation_str)
         if match:
             # locale.setlocale( locale.LC_ALL, 'en_US.UTF-8' )
             # elevation = locale.atoi(match.group(1))
             elevation = match.group(1)
             mountain_pass.elevation = elevation
-        pattern = re.compile(".*?(?=\()")
+        pattern = re.compile(r".*?(?=\()")  # Match up to first "." to get peak name.
         match2 = pattern.search(name_and_elevation_str)
         if match2:
             name = match2.group(0).strip(" ")
             mountain_pass.name = name
 
-
-        # if not name:
-        #     name = ""
-        # if not elevation:
-        #     elevation = 0
-
+    # Get pass class rating, if present. Grab the text from <p> and do regex and
+    # string replace directly on it to parse out class rating. Remainder is the
+    # pass description.
     text = tag.get_text()
     if text:
         text = text.replace('\n', ' ')
-        pattern = re.compile("Class.*?(\.)")
+        pattern = re.compile(r"Class.*?(\.)")
         match3 = pattern.search(text)
         if match3:
             class_rating = match3.group(0).strip('.')
@@ -136,12 +134,7 @@ def pass_parser(tag: Tag) -> Pass:
 
         mountain_pass.description = text
 
-    # pass_dc = Pass()
-    # pass_dc.name=name
-    # pass_dc.elevation=elevation
     return mountain_pass
-    # return tag
-
 
 def get_passes(soup: BeautifulSoup) -> List:
     """
@@ -155,17 +148,5 @@ def get_passes(soup: BeautifulSoup) -> List:
             output.append(pass_parser(sibling))
         elif sibling.name == "h4":
             break
-        # else:
-        #     print("Couldn't find next section tag: <h4>. Exiting.")
-        #     sys.exit()
-
-
-    # Get the <p> tags with the individual pass data.
-    # unparsed_passes: List = get_between_siblings(tag, "h4")
-    # # Because this is just a regular list, find the bs4 tags to work on.
-    # for element in unparsed_passes:
-    #     if isinstance(element, Tag):
-    #         # Parse the specific bs4 <p> tag with the pass info.
-    #         output.append(pass_parser(element))
 
     return output
