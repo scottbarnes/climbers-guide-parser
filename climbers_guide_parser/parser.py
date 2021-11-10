@@ -2,7 +2,7 @@ import re
 import copy
 # import locale
 import fileinput
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 import sys
 from bs4 import BeautifulSoup, Tag
@@ -57,23 +57,41 @@ class Pass:
     description: str = "Pending"
     region: Region = placeholder
 
+@dataclass
+class Route:
+    """ Route. Will be own documennt in DB. """
+    name: str = "Pending"
+    # peak: Peak = placeholder_peak  # TODO: Circular dependency issue here with peak and route.
+    class_rating: str = "Pending"
+    description: str = "Pending"
 
-def prepare_file():
-    """
-    Do some initial formatting of the files to make them easier to work with.
-    This writes changes to each file and only needs to be run once.
-    """
-    # 'encoding=' added in python 3.10.
-    with fileinput.FileInput(INPUT_FILE, inplace=True, backup='.bak', encoding='windows-1252') as file:
-        for line in file:
-            print(line.replace('<p><i>', '<p class="peak"><i>'), end='')
+@dataclass
+class Peak:
+    """ Peak. Will be own document in DB. """
+    name: str = "Pending"
+    elevations: list[str] = field(default_factory=list)
+    routes: list[Route] = field(default_factory=list)
+    region: Region =  placeholder
+    description: str = ""
+
+placeholder_peak = Peak()
 
 def get_soup() -> BeautifulSoup:
     """
-    Parse the book chapter and return it as an object.
+    Parse the book chapter and return it as an object, after parsing it as
+    a string to make navigation easier later.
     """
     with open(INPUT_FILE, encoding='windows-1252') as file:  # encoding is not ISO.
         soup = BeautifulSoup(file, 'lxml')
+
+    # Remove all links
+    links = soup.find_all("a")
+    for link in links:
+        link.extract()
+    soup = str(soup)
+    soup = soup.replace('<p><i>', '<p class="peak"><i>')  # <p><i> is only peaks to <p><i>References
+    soup = soup.replace('\n', ' ')  # The string process adds a lot of "\n".
+    soup = BeautifulSoup(soup, 'lxml')
 
     return soup
 
@@ -163,13 +181,86 @@ def get_passes(soup: BeautifulSoup) -> List:
 
     return output
 
-def get_peaks(soup: BeautifulSoup): # -> List:
+def get_name_and_elevation(tag: Tag) -> tuple[str, List[str]]:
+    """
+    Parse a tag to extract the name and elevation. Return it as a
+    tuple of the form: name: str, elevations: List[str]
+    """
+    name, _, elevations = tag.string.partition("(")
+    name = name.strip()
+    elevations = [e.strip(")( ") for e in elevations.split(";")]  # split on ";" and strip each.
+    return (name, elevations)
+
+    # name = ""
+    # elevation = ""
+    
+    # name_and_elevation: str = tag.string
+    # pattern = re.compile(r"\((.+)\)")  # Match up to first "(", where elevation starts.
+    # match = pattern.search(name_and_elevation)
+    # if match:
+    #     elevation = match.group(1)
+    # pattern = re.compile(r".*?(?=\()")  # Match up to first "." to get peak name.
+    # match2 = pattern.search(name_and_elevation)
+    # if match2:
+    #     name = match2.group(0).strip(" ")
+
+    # return (name, elevation)
+
+def parse_route(tag: Tag, peak: Peak) -> Route:
+    """
+    Parses a tag containing a route and returns a route dataclass.
+    Tag has the form:
+    <p> <i>Route 1. West slope.</i> Class 1. This is the easiest of the major peaks of the Palisades. ... </p>
+
+    TODO: Circular dependency here with peak referencing the route, and the route referecing the peak.
+    """
+    route = Route()
+
+    # If wanting to remove "Route X" prefix, could do it here by splitting on "." after extraction.
+    route.name = tag.i.extract().string.strip()          # Removes <i></i> and returns contents.
+    route.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
+    route.description = tag.text.split(".", 1)[1].strip()
+    # route.peak = peak
+
+    return route
+
+
+def parse_peak(tag: Tag) -> Peak:
+    """
+    Parse a tag containing a peak, and its related tags and return a peak dataclass.
+    tag is of the form: <p class="peak"><i>Mount Agassiz (13,882; 13,891n)</i></p>
+    Uses get_name_and_elevation() to extract the name and elevation, then steps through
+    the following tags, parses routes, and stops at the start of the next peak.
+    """
+    peak = Peak()
+    name, elevations = get_name_and_elevation(tag)
+
+    # Process the routes, stopping at the next peak.
+    for _, sibling in enumerate(tag.next_siblings):
+        if isinstance(sibling, Tag):
+            if "class" in sibling.attrs:
+                if sibling.attrs["class"] == ["peak"]:
+                    break  # Stopping as this is the next peak.
+            elif sibling.text.strip().split(" ")[0].strip() == "Route":  # "Route" is the first word of the string.
+                peak.routes.append(parse_route(sibling, peak))
+            else:
+                peak.description += sibling.text.strip() + "\n"
+
+
+
+    peak.name = name
+    peak.elevations = elevations
+
+    return peak
+
+def get_peaks(soup: BeautifulSoup) -> List[Peak]:
     """
     Parse the soup and return a list of peak datacasses.
     """
-    # Add a class to all peak code (<p><i>peak name</i></p>) to make work easier.
-    for tag in soup.find_all(re.compile(r"<p\s*.*><i\s*.*>")):
-        print(tag)
+    peaks = soup.find_all(class_="peak")
+    # parsed_peaks = List[Peak]
+    parsed_peaks = []
+    for peak in peaks:
+        parsed_peaks.append(parse_peak(peak))
 
-    for tag in soup.find_all(re.compile(r"^b")):
-        print(tag)
+    return parsed_peaks
