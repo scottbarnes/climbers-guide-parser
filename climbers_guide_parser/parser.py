@@ -1,6 +1,7 @@
 import re
 import copy
 # import locale
+import fileinput
 from dataclasses import dataclass
 from typing import List
 import sys
@@ -8,6 +9,7 @@ from bs4 import BeautifulSoup, Tag
 
 ### Config ###
 INPUT_FILE="/home/scott/Documents/A_Climbers_Guide/palisades.html"
+# U Notch in palisades.html needs manual adjusting of a misplaced <i>.
 ### End config ###
 
 # Dataclasses for:
@@ -55,6 +57,16 @@ class Pass:
     description: str = "Pending"
     region: Region = placeholder
 
+
+def prepare_file():
+    """
+    Do some initial formatting of the files to make them easier to work with.
+    This writes changes to each file and only needs to be run once.
+    """
+    # 'encoding=' added in python 3.10.
+    with fileinput.FileInput(INPUT_FILE, inplace=True, backup='.bak', encoding='windows-1252') as file:
+        for line in file:
+            print(line.replace('<p><i>', '<p class="peak"><i>'), end='')
 
 def get_soup() -> BeautifulSoup:
     """
@@ -150,3 +162,14 @@ def get_passes(soup: BeautifulSoup) -> List:
             break
 
     return output
+
+def get_peaks(soup: BeautifulSoup): # -> List:
+    """
+    Parse the soup and return a list of peak datacasses.
+    """
+    # Add a class to all peak code (<p><i>peak name</i></p>) to make work easier.
+    for tag in soup.find_all(re.compile(r"<p\s*.*><i\s*.*>")):
+        print(tag)
+
+    for tag in soup.find_all(re.compile(r"^b")):
+        print(tag)
