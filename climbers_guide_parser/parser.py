@@ -53,7 +53,8 @@ class Pass:
     """ Climbing/hiking pass. Will be own document in DB. """
     name: str = "Pending"
     class_rating: str = "Pending"
-    elevation: str = "Pending"
+    # elevation: str = "Pending"
+    elevations: list[str] = field(default_factory=list)
     description: str = "Pending"
     region: Region = placeholder
 
@@ -87,7 +88,8 @@ def get_soup() -> BeautifulSoup:
     # Remove all links
     links = soup.find_all("a")
     for link in links:
-        link.extract()
+        # link.extract()
+        link.decompose()
     soup = str(soup)
     soup = soup.replace('<p><i>', '<p class="peak"><i>')  # <p><i> is only peaks to <p><i>References
     soup = soup.replace('\n', ' ')  # The string process adds a lot of "\n".
@@ -125,44 +127,55 @@ def pass_parser(tag: Tag) -> Pass:
     """
 
     mountain_pass = Pass()
-
-    # Remove the random <a> tags that indicate book page numbers.
-    if tag.a:
-        tag.a.decompose()
-
-    # Process any pass names or elevations (first italics, if present.)
+    # elevations = List[str]
+    name = ""
     if tag.i:
-        name_and_elevation: Tag = tag.i.extract()  # Removes <i> from <p> contents.
-        name_and_elevation_str: str = name_and_elevation.string.extract()
-        pattern = re.compile(r"\((.+)\)")  # Match up to first "(", where elevation starts.
-        match = pattern.search(name_and_elevation_str)
-        if match:
-            # locale.setlocale( locale.LC_ALL, 'en_US.UTF-8' )
-            # elevation = locale.atoi(match.group(1))
-            elevation = match.group(1)
-            mountain_pass.elevation = elevation
-        pattern = re.compile(r".*?(?=\()")  # Match up to first "." to get peak name.
-        match2 = pattern.search(name_and_elevation_str)
-        if match2:
-            name = match2.group(0).strip(" ")
-            mountain_pass.name = name
+        name, elevations = get_name_and_elevation(tag.i)
+        tag.i.decompose()  # Clear out the <i> tag with the name and elevation.
+
+        mountain_pass.elevations = elevations
+        mountain_pass.name = name
+
+    mountain_pass.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
+    mountain_pass.description = tag.text.split(".", 1)[1].strip()
+
+    # # Remove the random <a> tags that indicate book page numbers.
+    # if tag.a:
+    #     tag.a.decompose()
+
+    # # Process any pass names or elevations (first italics, if present.)
+    # if tag.i:
+    #     name_and_elevation: Tag = tag.i.extract()  # Removes <i> from <p> contents.
+    #     name_and_elevation_str: str = name_and_elevation.string.extract()
+    #     pattern = re.compile(r"\((.+)\)")  # Match up to first "(", where elevation starts.
+    #     match = pattern.search(name_and_elevation_str)
+    #     if match:
+    #         # locale.setlocale( locale.LC_ALL, 'en_US.UTF-8' )
+    #         # elevation = locale.atoi(match.group(1))
+    #         elevation = match.group(1)
+    #         mountain_pass.elevation = elevation
+    #     pattern = re.compile(r".*?(?=\()")  # Match up to first "." to get peak name.
+    #     match2 = pattern.search(name_and_elevation_str)
+    #     if match2:
+    #         name = match2.group(0).strip(" ")
+    #         mountain_pass.name = name
 
     # Get pass class rating, if present. Grab the text from <p> and do regex and
     # string replace directly on it to parse out class rating. Remainder is the
     # pass description.
-    text = tag.get_text()
-    if text:
-        text = text.replace('\n', ' ')
-        pattern = re.compile(r"Class.*?(\.)")
-        match3 = pattern.search(text)
-        if match3:
-            class_rating = match3.group(0).strip('.')
-            mountain_pass.class_rating = class_rating
-            text = text.replace(match3.group(0), '').strip(' ')
-        else:
-            text = text.strip(' ')
+    # text = tag.get_text()
+    # if text:
+    #     text = text.replace('\n', ' ')
+    #     pattern = re.compile(r"Class.*?(\.)")
+    #     match3 = pattern.search(text)
+    #     if match3:
+    #         class_rating = match3.group(0).strip('.')
+    #         mountain_pass.class_rating = class_rating
+    #         text = text.replace(match3.group(0), '').strip(' ')
+    #     else:
+    #         text = text.strip(' ')
 
-        mountain_pass.description = text
+    #     mountain_pass.description = text
 
     return mountain_pass
 
@@ -184,27 +197,14 @@ def get_passes(soup: BeautifulSoup) -> List:
 def get_name_and_elevation(tag: Tag) -> tuple[str, List[str]]:
     """
     Parse a tag to extract the name and elevation. Return it as a
-    tuple of the form: name: str, elevations: List[str]
+    tuple of the form: name: str, elevations: List[str]. Tag has the form:
+    <i>Glacier Notch (13,000+).</i>
     """
-    name, _, elevations = tag.string.partition("(")
+    # name, _, elevations = tag.string.partition("(")
+    name, _, elevations = tag.text.partition("(")
     name = name.strip()
     elevations = [e.strip(")( ") for e in elevations.split(";")]  # split on ";" and strip each.
     return (name, elevations)
-
-    # name = ""
-    # elevation = ""
-    
-    # name_and_elevation: str = tag.string
-    # pattern = re.compile(r"\((.+)\)")  # Match up to first "(", where elevation starts.
-    # match = pattern.search(name_and_elevation)
-    # if match:
-    #     elevation = match.group(1)
-    # pattern = re.compile(r".*?(?=\()")  # Match up to first "." to get peak name.
-    # match2 = pattern.search(name_and_elevation)
-    # if match2:
-    #     name = match2.group(0).strip(" ")
-
-    # return (name, elevation)
 
 def parse_route(tag: Tag, peak: Peak) -> Route:
     """
@@ -245,8 +245,6 @@ def parse_peak(tag: Tag) -> Peak:
                 peak.routes.append(parse_route(sibling, peak))
             else:
                 peak.description += sibling.text.strip() + "\n"
-
-
 
     peak.name = name
     peak.elevations = elevations
