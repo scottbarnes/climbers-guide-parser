@@ -56,7 +56,7 @@ class Pass:
     # elevation: str = "Pending"
     elevations: list[str] = field(default_factory=list)
     description: str = "Pending"
-    region: Region = placeholder
+    # region: Region = placeholder
 
 @dataclass
 class Route:
@@ -72,7 +72,7 @@ class Peak:
     name: str = "Pending"
     elevations: list[str] = field(default_factory=list)
     routes: list[Route] = field(default_factory=list)
-    region: Region =  placeholder
+    # region: Region =  placeholder
     description: str = ""
 
 placeholder_peak = Peak()
@@ -139,44 +139,6 @@ def pass_parser(tag: Tag) -> Pass:
     mountain_pass.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
     mountain_pass.description = tag.text.split(".", 1)[1].strip()
 
-    # # Remove the random <a> tags that indicate book page numbers.
-    # if tag.a:
-    #     tag.a.decompose()
-
-    # # Process any pass names or elevations (first italics, if present.)
-    # if tag.i:
-    #     name_and_elevation: Tag = tag.i.extract()  # Removes <i> from <p> contents.
-    #     name_and_elevation_str: str = name_and_elevation.string.extract()
-    #     pattern = re.compile(r"\((.+)\)")  # Match up to first "(", where elevation starts.
-    #     match = pattern.search(name_and_elevation_str)
-    #     if match:
-    #         # locale.setlocale( locale.LC_ALL, 'en_US.UTF-8' )
-    #         # elevation = locale.atoi(match.group(1))
-    #         elevation = match.group(1)
-    #         mountain_pass.elevation = elevation
-    #     pattern = re.compile(r".*?(?=\()")  # Match up to first "." to get peak name.
-    #     match2 = pattern.search(name_and_elevation_str)
-    #     if match2:
-    #         name = match2.group(0).strip(" ")
-    #         mountain_pass.name = name
-
-    # Get pass class rating, if present. Grab the text from <p> and do regex and
-    # string replace directly on it to parse out class rating. Remainder is the
-    # pass description.
-    # text = tag.get_text()
-    # if text:
-    #     text = text.replace('\n', ' ')
-    #     pattern = re.compile(r"Class.*?(\.)")
-    #     match3 = pattern.search(text)
-    #     if match3:
-    #         class_rating = match3.group(0).strip('.')
-    #         mountain_pass.class_rating = class_rating
-    #         text = text.replace(match3.group(0), '').strip(' ')
-    #     else:
-    #         text = text.strip(' ')
-
-    #     mountain_pass.description = text
-
     return mountain_pass
 
 def get_passes(soup: BeautifulSoup) -> List:
@@ -203,7 +165,7 @@ def get_name_and_elevation(tag: Tag) -> tuple[str, List[str]]:
     # name, _, elevations = tag.string.partition("(")
     name, _, elevations = tag.text.partition("(")
     name = name.strip()
-    elevations = [e.strip(")( ") for e in elevations.split(";")]  # split on ";" and strip each.
+    elevations = [e.strip(".)( ") for e in elevations.split(";")]  # split on ";" and strip each.
     return (name, elevations)
 
 def parse_route(tag: Tag, peak: Peak) -> Route:
