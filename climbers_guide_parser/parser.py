@@ -8,8 +8,10 @@ import sys
 from bs4 import BeautifulSoup, Tag
 
 ### Config ###
-INPUT_FILE="/home/scott/Documents/A_Climbers_Guide/palisades.html"
-# U Notch in palisades.html needs manual adjusting of a misplaced <i>.
+INPUT_FILE="/home/scott/Documents/A_Climbers_Guide/evolution_black_divide.html"
+# Manual adjustments
+# palisades.html: U Notch in needs manual adjusting of a misplaced <i>.
+# evolution_black_divide.html needs <p> on Route 2 for Mount Haeckel.
 ### End config ###
 
 # Dataclasses for:
@@ -146,7 +148,7 @@ def get_passes(soup: BeautifulSoup) -> List:
     Parse the soup and return a list of pass dataclasses.
     """
     output = []
-    pass_section_start: Tag = soup.find("h4", string="Principal Passes")
+    pass_section_start: Tag = soup.find("h4", string=re.compile(r"passes", re.IGNORECASE))
     # All the <p> tags are passes, and <h4> ends the section.
     for sibling in pass_section_start.next_siblings:
         if sibling.name == "p":
