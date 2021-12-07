@@ -8,11 +8,36 @@ import sys
 from bs4 import BeautifulSoup, Tag
 
 ### Config ###
-INPUT_FILE="/home/scott/Documents/A_Climbers_Guide/evolution_black_divide.html"
-# Manual adjustments
-# palisades.html: U Notch in needs manual adjusting of a misplaced <i>.
-# evolution_black_divide.html needs <p> on Route 2 for Mount Haeckel.
+
+INPUT_FILES=[
+    "/home/scott/Documents/A_Climbers_Guide/mono_pass_to_pine_creek_pass.html",
+]
+
+# INPUT_FILES=[
+#     "/home/scott/Documents/A_Climbers_Guide/mono_pass_to_pine_creek_pass.html",
+#     "/home/scott/Documents/A_Climbers_Guide/kaweahs_great_western_divide.html",
+#     "/home/scott/Documents/A_Climbers_Guide/palisades_to_kearsarge_pass.html",
+#     "/home/scott/Documents/A_Climbers_Guide/bond_to_tioga_other_peaks.html",
+#     "/home/scott/Documents/A_Climbers_Guide/mammoth_pass_to_mono_pass.html",
+#     "/home/scott/Documents/A_Climbers_Guide/evolution_black_divide.html",
+#     "/home/scott/Documents/A_Climbers_Guide/minarets_ritter_range.html",
+#     "/home/scott/Documents/A_Climbers_Guide/palisades.html",
+#     "/home/scott/Documents/A_Climbers_Guide/kings-kern_divide.html",
+#     "/home/scott/Documents/A_Climbers_Guide/yosemite_valley.html",
+#     "/home/scott/Documents/A_Climbers_Guide/cathedral_range.html",
+#     "/home/scott/Documents/A_Climbers_Guide/mount_humphreys.html",
+#     "/home/scott/Documents/A_Climbers_Guide/sawtooth_ridge.html",
+#     "/home/scott/Documents/A_Climbers_Guide/leconte_divide.html",
+#     "/home/scott/Documents/A_Climbers_Guide/kings_canyon.html",
+#     "/home/scott/Documents/A_Climbers_Guide/clark_range.html",
+#     "/home/scott/Documents/A_Climbers_Guide/whitney.html",
+# ]
+
 ### End config ###
+
+## Manual adjustments and notes
+# Just look at the git repository for the HTML files for any adjustments.
+
 
 # Dataclasses for:
 # regions
@@ -58,6 +83,7 @@ class Pass:
     # elevation: str = "Pending"
     elevations: list[str] = field(default_factory=list)
     description: str = "Pending"
+    location_description: str = ""
     # region: Region = placeholder
 
 @dataclass
@@ -76,10 +102,13 @@ class Peak:
     routes: list[Route] = field(default_factory=list)
     # region: Region =  placeholder
     description: str = ""
+    location_description: str = ""
+    gps_coordinates: str = ""
+    utm_coordinates: str = ""
 
 placeholder_peak = Peak()
 
-def get_soup() -> BeautifulSoup:
+def get_soup(INPUT_FILE) -> BeautifulSoup:
     """
     Parse the book chapter and return it as an object, after parsing it as
     a string to make navigation easier later.
@@ -131,8 +160,10 @@ def pass_parser(tag: Tag) -> Pass:
     mountain_pass = Pass()
     # elevations = List[str]
     name = ""
+    location_description = ""
+
     if tag.i:
-        name, elevations = get_name_and_elevation(tag.i)
+        name, elevations, location_description = get_name_and_elevation(tag.i)
         tag.i.decompose()  # Clear out the <i> tag with the name and elevation.
 
         mountain_pass.elevations = elevations
@@ -140,6 +171,7 @@ def pass_parser(tag: Tag) -> Pass:
 
     mountain_pass.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
     mountain_pass.description = tag.text.split(".", 1)[1].strip()
+    mountain_pass.location_description = location_description
 
     return mountain_pass
 
@@ -158,19 +190,26 @@ def get_passes(soup: BeautifulSoup) -> List:
 
     return output
 
-def get_name_and_elevation(tag: Tag) -> tuple[str, List[str]]:
+def get_name_and_elevation(tag: Tag) -> tuple[str, List[str], str]:
     """
     Parse a tag to extract the name and elevation. Return it as a
     tuple of the form: name: str, elevations: List[str]. Tag has the form:
     <i>Glacier Notch (13,000+).</i>
     """
     # name, _, elevations = tag.string.partition("(")
+    location_description = ""
     name, _, elevations = tag.text.partition("(")
-    name = name.strip()
-    elevations = [e.strip(".)( ") for e in elevations.split(";")]  # split on ";" and strip each.
-    return (name, elevations)
+    name = name.strip(" ,.")
+    elevations = [e.strip(".,)( ") for e in elevations.split(";")]  # split on ";" and strip each.
+    # Get narrative location descriptions (e.g 0.6 NE of Mount Morgan)
+    p = re.compile('\d\s[NEWS]')
+    for i, e in enumerate(elevations):
+        if p.search(e):
+            location_description = elevations.pop(i)
 
-def parse_route(tag: Tag, peak: Peak) -> Route:
+    return (name, elevations, location_description)
+
+def parse_route_enumerated(tag: Tag, peak: Peak) -> Route:
     """
     Parses a tag containing a route and returns a route dataclass.
     Tag has the form:
@@ -188,6 +227,29 @@ def parse_route(tag: Tag, peak: Peak) -> Route:
 
     return route
 
+def parse_route_unenumerated(tag: Tag, peak: Peak) -> Route:
+    """
+    Parses a tag containing a 'default' (i.e. single, unnumbered) route and returns a route dataclass.
+    Tag has the form:
+    <p>
+    Class 3. First ascent by David R. Brower, Hervey Voge, and Norman
+    Clyde on June 25, 1934. From the northeast follow the arête from Crag
+    5 to the 5-6 notch, and ascend the west side of the northwest arête.
+    </p>
+
+    TODO: Circular dependency here with peak referencing the route, and the route referecing the peak.
+    """
+    route = Route()
+
+    # If wanting to remove "Route X" prefix, could do it here by splitting on "." after extraction.
+    route.name = "Route 1"  # This is the only included route for the peak.
+    route.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
+    route.description = tag.text.split(".", 1)[1].strip()
+    # route.peak = peak
+
+    return route
+
+
 
 def parse_peak(tag: Tag) -> Peak:
     """
@@ -197,7 +259,7 @@ def parse_peak(tag: Tag) -> Peak:
     the following tags, parses routes, and stops at the start of the next peak.
     """
     peak = Peak()
-    name, elevations = get_name_and_elevation(tag)
+    name, elevations, location_description = get_name_and_elevation(tag)
 
     # Process the routes, stopping at the next peak.
     for _, sibling in enumerate(tag.next_siblings):
@@ -206,12 +268,15 @@ def parse_peak(tag: Tag) -> Peak:
                 if sibling.attrs["class"] == ["peak"]:
                     break  # Stopping as this is the next peak.
             elif sibling.text.strip().split(" ")[0].strip() == "Route":  # "Route" is the first word of the string.
-                peak.routes.append(parse_route(sibling, peak))
+                peak.routes.append(parse_route_enumerated(sibling, peak))
+            elif sibling.text.strip().split(" ")[0].strip() == "Class":  # "Class" is the first word of the string.
+                peak.routes.append(parse_route_unenumerated(sibling, peak))
             else:
                 peak.description += sibling.text.strip() + "\n"
 
     peak.name = name
     peak.elevations = elevations
+    peak.location_description = location_description
 
     return peak
 
@@ -226,3 +291,17 @@ def get_peaks(soup: BeautifulSoup) -> List[Peak]:
         parsed_peaks.append(parse_peak(peak))
 
     return parsed_peaks
+
+def do_peaks():
+    """
+    Iterate through the book and run the scripts on each input.
+    """
+    peaks = []
+    passes = []
+
+    for file in INPUT_FILES:
+        soup = get_soup(file)
+        peaks += get_peaks(soup)
+        passes += get_passes(soup)
+
+    return peaks, passes
