@@ -163,7 +163,7 @@ def pass_parser(tag: Tag) -> Pass:
     location_description = ""
 
     if tag.i:
-        name, elevations, location_description = get_name_and_elevation(tag.i)
+        name, elevations, location_description = get_name_elevation_and_description(tag.i)
         tag.i.decompose()  # Clear out the <i> tag with the name and elevation.
 
         mountain_pass.elevations = elevations
@@ -190,18 +190,20 @@ def get_passes(soup: BeautifulSoup) -> List:
 
     return output
 
-def get_name_and_elevation(tag: Tag) -> tuple[str, List[str], str]:
+def get_name_elevation_and_description(tag: Tag) -> tuple[str, List[str], str]:
     """
-    Parse a tag to extract the name and elevation. Return it as a
-    tuple of the form: name: str, elevations: List[str]. Tag has the form:
+    Parse a tag to extract the name, elevation, and location description. Return it as a
+    tuple of the form: name: str, elevations: List[str], location_description: str. Tag has the form:
     <i>Glacier Notch (13,000+).</i>
+    <i>Peak 12,135 (12,205n; 1 NW of Recess Peak)</i>
     """
     # name, _, elevations = tag.string.partition("(")
     location_description = ""
     name, _, elevations = tag.text.partition("(")
     name = name.strip(" ,.")
     elevations = [e.strip(".,)( ") for e in elevations.split(";")]  # split on ";" and strip each.
-    # Get narrative location descriptions (e.g 0.6 NE of Mount Morgan)
+    # Get narrative location descriptions (e.g 0.6 NE of Mount Morgan) and remove it from
+    # the list of elevations.
     p = re.compile('\d\s[NEWS]')
     for i, e in enumerate(elevations):
         if p.search(e):
@@ -255,11 +257,11 @@ def parse_peak(tag: Tag) -> Peak:
     """
     Parse a tag containing a peak, and its related tags and return a peak dataclass.
     tag is of the form: <p class="peak"><i>Mount Agassiz (13,882; 13,891n)</i></p>
-    Uses get_name_and_elevation() to extract the name and elevation, then steps through
+    Uses get_name_elevation_and_description() to extract the name and elevation, then steps through
     the following tags, parses routes, and stops at the start of the next peak.
     """
     peak = Peak()
-    name, elevations, location_description = get_name_and_elevation(tag)
+    name, elevations, location_description = get_name_elevation_and_description(tag)
 
     # Process the routes, stopping at the next peak.
     for _, sibling in enumerate(tag.next_siblings):
