@@ -230,7 +230,7 @@ def parse_route_enumerated(tag: Tag, peak: Peak) -> Route:
     route = Route()
 
     # If wanting to remove "Route X" prefix, could do it here by splitting on "." after extraction.
-    route.name = tag.i.extract().string.strip()          # Removes <i></i> and returns contents.
+    route.name = tag.i.extract().string.strip(" .,")          # Removes <i></i> and returns contents.
     route.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
     route.description = tag.text.split(".", 1)[1].strip()
     # route.peak = peak
