@@ -10,7 +10,8 @@ from bs4 import BeautifulSoup, Tag
 ### Config ###
 
 INPUT_FILES=[
-    "/home/scott/Documents/A_Climbers_Guide/kaweahs_great_western_divide.html",
+    # "/home/scott/Documents/A_Climbers_Guide/kaweahs_great_western_divide.html",
+    "/home/scott/Documents/A_Climbers_Guide/palisades.html",
 ]
 
 # INPUT_FILES=[
@@ -302,7 +303,7 @@ def get_peaks(soup: BeautifulSoup) -> List[Peak]:
         if "References" in p.name or "Photographs" in p.name:
             continue
 
-        parsed_peaks.append(parse_peak(peak))
+        parsed_peaks.append(p)
 
     return parsed_peaks
 
