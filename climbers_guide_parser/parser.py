@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup, Tag
 ### Config ###
 
 INPUT_FILES=[
-    "/home/scott/Documents/A_Climbers_Guide/mono_pass_to_pine_creek_pass.html",
+    "/home/scott/Documents/A_Climbers_Guide/kaweahs_great_western_divide.html",
 ]
 
 # INPUT_FILES=[
@@ -79,6 +79,7 @@ placeholder = Region("Pending", "Pending")
 class Pass:
     """ Climbing/hiking pass. Will be own document in DB. """
     name: str = "Pending"
+    aka: list[str] = field(default_factory=list)
     class_rating: str = "Pending"
     # elevation: str = "Pending"
     elevations: list[str] = field(default_factory=list)
@@ -90,6 +91,7 @@ class Pass:
 class Route:
     """ Route. Will be own documennt in DB. """
     name: str = "Pending"
+    aka: list[str] = field(default_factory=list)
     # peak: Peak = placeholder_peak  # TODO: Circular dependency issue here with peak and route.
     class_rating: str = "Pending"
     description: str = "Pending"
@@ -98,6 +100,7 @@ class Route:
 class Peak:
     """ Peak. Will be own document in DB. """
     name: str = "Pending"
+    aka: list[str] = field(default_factory=list)
     elevations: list[str] = field(default_factory=list)
     routes: list[Route] = field(default_factory=list)
     # region: Region =  placeholder
@@ -179,16 +182,20 @@ def get_passes(soup: BeautifulSoup) -> List:
     """
     Parse the soup and return a list of pass dataclasses.
     """
-    output = []
+    passes = []
     pass_section_start: Tag = soup.find("h4", string=re.compile(r"passes", re.IGNORECASE))
     # All the <p> tags are passes, and <h4> ends the section.
     for sibling in pass_section_start.next_siblings:
         if sibling.name == "p":
-            output.append(pass_parser(sibling))
+            p = pass_parser(sibling)
+            # Don't add non-passes.
+            if "References" in p.name or "Photographs" in p.name:
+                continue
+            passes.append(p)
         elif sibling.name == "h4":
             break
 
-    return output
+    return passes
 
 def get_name_elevation_and_description(tag: Tag) -> tuple[str, List[str], str]:
     """
@@ -290,6 +297,11 @@ def get_peaks(soup: BeautifulSoup) -> List[Peak]:
     # parsed_peaks = List[Peak]
     parsed_peaks = []
     for peak in peaks:
+        p = parse_peak(peak)
+        # Don't add non-peaks.
+        if "References" in p.name or "Photographs" in p.name:
+            continue
+
         parsed_peaks.append(parse_peak(peak))
 
     return parsed_peaks
