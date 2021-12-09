@@ -10,8 +10,8 @@ from bs4 import BeautifulSoup, Tag
 ### Config ###
 
 INPUT_FILES=[
-    # "/home/scott/Documents/A_Climbers_Guide/kaweahs_great_western_divide.html",
-    "/home/scott/Documents/A_Climbers_Guide/palisades.html",
+    "/home/scott/Documents/A_Climbers_Guide/bond_to_tioga_other_peaks.html",
+    # "/home/scott/Documents/A_Climbers_Guide/palisades.html",
 ]
 
 # INPUT_FILES=[
@@ -37,6 +37,7 @@ INPUT_FILES=[
 ### End config ###
 
 ## Manual adjustments and notes
+# Use http://www.highsierratopix.com/high-sierra-map/map.php to help locate passes.
 # Just look at the git repository for the HTML files for any adjustments.
 
 
@@ -132,25 +133,25 @@ def get_soup(INPUT_FILE) -> BeautifulSoup:
 
     return soup
 
-def get_between_siblings(bs_tag: Tag, html_tag: str) -> list:
-    """
-    Takes a bs4 tag and an str html tag and returns a list of all bs4.element.Tag and
-    bs4.element.NavigableString between the two.
-    the two. E.g.
-        bs_tag = soup.find("h4", string="Principal Passes")
-        html_tag = "h4"
-    The above returns everything between <h4>Principal Passes</h4> and the next <h4> tag.
+# def get_between_siblings(bs_tag: Tag, html_tag: str) -> list:
+#     """
+#     Takes a bs4 tag and an str html tag and returns a list of all bs4.element.Tag and
+#     bs4.element.NavigableString between the two.
+#     the two. E.g.
+#         bs_tag = soup.find("h4", string="Principal Passes")
+#         html_tag = "h4"
+#     The above returns everything between <h4>Principal Passes</h4> and the next <h4> tag.
 
-    Note: the problem with this is that it returns a list and loses navigability and
-    bs components must be re-extracted.
-    """
-    output = [] # list with bs4.element.Tag and bs4.element.NavigableString.
-    for sibling in bs_tag.next_siblings:
-        if sibling.name == html_tag:
-            break
-        output.append(copy.copy(sibling))
+#     Note: the problem with this is that it returns a list and loses navigability and
+#     bs components must be re-extracted.
+#     """
+#     output = [] # list with bs4.element.Tag and bs4.element.NavigableString.
+#     for sibling in bs_tag.next_siblings:
+#         if sibling.name == html_tag:
+#             break
+#         output.append(copy.copy(sibling))
 
-    return output
+#     return output
 
 def pass_parser(tag: Tag) -> Pass:
     """
@@ -186,15 +187,19 @@ def get_passes(soup: BeautifulSoup) -> List:
     passes = []
     pass_section_start: Tag = soup.find("h4", string=re.compile(r"passes", re.IGNORECASE))
     # All the <p> tags are passes, and <h4> ends the section.
-    for sibling in pass_section_start.next_siblings:
-        if sibling.name == "p":
-            p = pass_parser(sibling)
-            # Don't add non-passes.
-            if "References" in p.name or "Photographs" in p.name:
-                continue
-            passes.append(p)
-        elif sibling.name == "h4":
-            break
+    # Use 'try' to catch when there are no passes in the file.
+    try:
+        for sibling in pass_section_start.next_siblings:
+            if sibling.name == "p":
+                p = pass_parser(sibling)
+                # Don't add non-passes.
+                if "References" in p.name or "Photographs" in p.name:
+                    continue
+                passes.append(p)
+            elif sibling.name == "h4":
+                break
+    except AttributeError:
+        return passes
 
     return passes
 
@@ -221,11 +226,12 @@ def get_name_elevation_and_description(tag: Tag) -> tuple[str, List[str], str]:
 
 def parse_route_enumerated(tag: Tag, peak: Peak) -> Route:
     """
-    Parses a tag containing a route and returns a route dataclass.
-    Tag has the form:
+    Parses a tag containing a route and returns a route dataclass. Tag has the
+    form:
     <p> <i>Route 1. West slope.</i> Class 1. This is the easiest of the major peaks of the Palisades. ... </p>
 
-    TODO: Circular dependency here with peak referencing the route, and the route referecing the peak.
+    TODO: Circular dependency here with peak referencing the route, and the
+    route referecing the peak.
     """
     route = Route()
 
@@ -239,15 +245,16 @@ def parse_route_enumerated(tag: Tag, peak: Peak) -> Route:
 
 def parse_route_unenumerated(tag: Tag, peak: Peak) -> Route:
     """
-    Parses a tag containing a 'default' (i.e. single, unnumbered) route and returns a route dataclass.
-    Tag has the form:
+    Parses a tag containing a 'default' (i.e. single, unnumbered) route and
+    returns a route dataclass. Tag has the form:
     <p>
     Class 3. First ascent by David R. Brower, Hervey Voge, and Norman
     Clyde on June 25, 1934. From the northeast follow the arête from Crag
     5 to the 5-6 notch, and ascend the west side of the northwest arête.
     </p>
 
-    TODO: Circular dependency here with peak referencing the route, and the route referecing the peak.
+    TODO: Circular dependency here with peak referencing the route, and the
+    route referecing the peak.
     """
     route = Route()
 
@@ -263,26 +270,40 @@ def parse_route_unenumerated(tag: Tag, peak: Peak) -> Route:
 
 def parse_peak(tag: Tag) -> Peak:
     """
-    Parse a tag containing a peak, and its related tags and return a peak dataclass.
-    tag is of the form: <p class="peak"><i>Mount Agassiz (13,882; 13,891n)</i></p>
-    Uses get_name_elevation_and_description() to extract the name and elevation, then steps through
-    the following tags, parses routes, and stops at the start of the next peak.
+    Parse a tag containing a peak, and its related tags and return a peak
+    dataclass. tag is of the following forms:
+        <p class="peak"><i>Mount Agassiz (13,882; 13,891n)</i></p>
+        <p class="peak"><i>Peak 12,135 (12,205n; 1 NW of Recess Peak)</i></p>
+    Uses get_name_elevation_and_description() to extract the name, elevation,
+    and description, then steps through the following tags, parses routes, and
+    stops at the start of the next peak or the end of the chapter.
+
+    Additionally, if a peak has no enumerated routes (e.g. Route 1, Route 2),
+    but lists a route starting with "Class X. Ascend the north slope", or
+    something of that nature, run parse_route_unenumerated to create that as
+    the default Route 1.
     """
     peak = Peak()
     name, elevations, location_description = get_name_elevation_and_description(tag)
 
-    # Process the routes, stopping at the next peak.
+    # Process the routes, stopping at the next peak or the end of the chapter.
     for _, sibling in enumerate(tag.next_siblings):
         if isinstance(sibling, Tag):
             if "class" in sibling.attrs:
                 if sibling.attrs["class"] == ["peak"]:
+                    print("breaking at next peak")
                     break  # Stopping as this is the next peak.
+            if "clear" in sibling.attrs:
+                if sibling.attrs["clear"] == "all":
+                    print("Breaking at clear")
+                    break  # End of the chapter.
             elif sibling.text.strip().split(" ")[0].strip() == "Route":  # "Route" is the first word of the string.
                 peak.routes.append(parse_route_enumerated(sibling, peak))
             elif sibling.text.strip().split(" ")[0].strip() == "Class":  # "Class" is the first word of the string.
                 peak.routes.append(parse_route_unenumerated(sibling, peak))
             else:
-                peak.description += sibling.text.strip() + "\n"
+                print("Adding to description")
+                peak.description += sibling.text.strip() + "\n"  # Nothing else matched, so make it part of the description.
 
     peak.name = name
     peak.elevations = elevations
