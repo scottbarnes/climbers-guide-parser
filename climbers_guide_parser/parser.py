@@ -224,27 +224,14 @@ def get_name_elevation_and_description(tag: Tag) -> tuple[str, List[str], str]:
 
     return (name, elevations, location_description)
 
-def parse_route_enumerated(tag: Tag, peak: Peak) -> Route:
+def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
     """
     Parses a tag containing a route and returns a route dataclass. Tag has the
     form:
     <p> <i>Route 1. West slope.</i> Class 1. This is the easiest of the major peaks of the Palisades. ... </p>
 
-    TODO: Circular dependency here with peak referencing the route, and the
-    route referecing the peak.
-    """
-    route = Route()
+    OR
 
-    # If wanting to remove "Route X" prefix, could do it here by splitting on "." after extraction.
-    route.name = tag.i.extract().string.strip(" .,")          # Removes <i></i> and returns contents.
-    route.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
-    route.description = tag.text.split(".", 1)[1].strip()
-    # route.peak = peak
-
-    return route
-
-def parse_route_unenumerated(tag: Tag, peak: Peak) -> Route:
-    """
     Parses a tag containing a 'default' (i.e. single, unnumbered) route and
     returns a route dataclass. Tag has the form:
     <p>
@@ -259,14 +246,16 @@ def parse_route_unenumerated(tag: Tag, peak: Peak) -> Route:
     route = Route()
 
     # If wanting to remove "Route X" prefix, could do it here by splitting on "." after extraction.
-    route.name = "Route 1"  # This is the only included route for the peak.
+    if kind == "Route":
+        route.name = tag.i.extract().string.strip(" .,")          # Removes <i></i> and returns contents.
+    elif kind == "Class":
+        route.name = "Route 1"  # This is the only included route for the peak.
+
     route.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
     route.description = tag.text.split(".", 1)[1].strip()
     # route.peak = peak
 
     return route
-
-
 
 def parse_peak(tag: Tag) -> Peak:
     """
@@ -286,24 +275,28 @@ def parse_peak(tag: Tag) -> Peak:
     peak = Peak()
     name, elevations, location_description = get_name_elevation_and_description(tag)
 
-    # Process the routes, stopping at the next peak or the end of the chapter.
+    # For each peak, go through and process the peak name, elevation(s),
+    # route(s), and description.
     for _, sibling in enumerate(tag.next_siblings):
-        if isinstance(sibling, Tag):
-            if "class" in sibling.attrs:
-                if sibling.attrs["class"] == ["peak"]:
-                    print("breaking at next peak")
-                    break  # Stopping as this is the next peak.
-            if "clear" in sibling.attrs:
-                if sibling.attrs["clear"] == "all":
-                    print("Breaking at clear")
-                    break  # End of the chapter.
-            elif sibling.text.strip().split(" ")[0].strip() == "Route":  # "Route" is the first word of the string.
-                peak.routes.append(parse_route_enumerated(sibling, peak))
-            elif sibling.text.strip().split(" ")[0].strip() == "Class":  # "Class" is the first word of the string.
-                peak.routes.append(parse_route_unenumerated(sibling, peak))
-            else:
-                print("Adding to description")
-                peak.description += sibling.text.strip() + "\n"  # Nothing else matched, so make it part of the description.
+        # Only operate on tags
+        if not isinstance(sibling, Tag):
+            continue
+
+        # Stop at the next peak or the end of the chapter.
+        if "class" in sibling.attrs:
+            if sibling.attrs["class"] == ["peak"]:
+                break  # Stopping as this is the next peak.
+        elif "clear" in sibling.attrs:
+            if sibling.attrs["clear"] == "all":
+                break  # End of the chapter.
+
+        # Get the first word of any strings, as it's used to parse the route,
+        # and just add anything else to the peak's description.
+        first_word = sibling.text.strip().split(" ")[0].strip()
+        if first_word in ["Route", "Class"]:
+            peak.routes.append(parse_route(sibling, peak, first_word))
+        else:
+            peak.description += sibling.text.strip() + "\n"
 
     peak.name = name
     peak.elevations = elevations
