@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup, Tag
 ### Config ###
 
 INPUT_FILES=[
-    "/home/scott/Documents/A_Climbers_Guide/bond_to_tioga_other_peaks.html",
+    "/home/scott/Documents/A_Climbers_Guide/yosemite_valley.html",
     # "/home/scott/Documents/A_Climbers_Guide/palisades.html",
 ]
 
@@ -133,26 +133,6 @@ def get_soup(INPUT_FILE) -> BeautifulSoup:
 
     return soup
 
-# def get_between_siblings(bs_tag: Tag, html_tag: str) -> list:
-#     """
-#     Takes a bs4 tag and an str html tag and returns a list of all bs4.element.Tag and
-#     bs4.element.NavigableString between the two.
-#     the two. E.g.
-#         bs_tag = soup.find("h4", string="Principal Passes")
-#         html_tag = "h4"
-#     The above returns everything between <h4>Principal Passes</h4> and the next <h4> tag.
-
-#     Note: the problem with this is that it returns a list and loses navigability and
-#     bs components must be re-extracted.
-#     """
-#     output = [] # list with bs4.element.Tag and bs4.element.NavigableString.
-#     for sibling in bs_tag.next_siblings:
-#         if sibling.name == html_tag:
-#             break
-#         output.append(copy.copy(sibling))
-
-#     return output
-
 def pass_parser(tag: Tag) -> Pass:
     """
     Take the bs4 <p> tag holding the pass information, parse it, and return a
@@ -217,7 +197,7 @@ def get_name_elevation_and_description(tag: Tag) -> tuple[str, List[str], str]:
     elevations = [e.strip(".,)( ") for e in elevations.split(";")]  # split on ";" and strip each.
     # Get narrative location descriptions (e.g 0.6 NE of Mount Morgan) and remove it from
     # the list of elevations.
-    p = re.compile('\d\s[NEWS]')
+    p = re.compile('\\d\\s[NEWS]')
     for i, e in enumerate(elevations):
         if p.search(e):
             location_description = elevations.pop(i)
@@ -229,9 +209,9 @@ def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
     Parses a tag containing a route and returns a route dataclass. Tag has the
     form:
     <p> <i>Route 1. West slope.</i> Class 1. This is the easiest of the major peaks of the Palisades. ... </p>
-
-    OR
-
+    or:
+    <p><i>Kat Walk.</i> Class 4. First ascent September 1929 by Ralph S. Griswold.
+    or
     Parses a tag containing a 'default' (i.e. single, unnumbered) route and
     returns a route dataclass. Tag has the form:
     <p>
@@ -271,6 +251,8 @@ def parse_peak(tag: Tag) -> Peak:
     but lists a route starting with "Class X. Ascend the north slope", or
     something of that nature, run parse_route_unenumerated to create that as
     the default Route 1.
+
+    Finally, if it's a 'yosemite.html' route description, that's parsed also.
     """
     peak = Peak()
     name, elevations, location_description = get_name_elevation_and_description(tag)
@@ -295,6 +277,8 @@ def parse_peak(tag: Tag) -> Peak:
         first_word = sibling.text.strip().split(" ")[0].strip()
         if first_word in ["Route", "Class"]:
             peak.routes.append(parse_route(sibling, peak, first_word))
+        elif is_route_has_no_route_prefix(sibling):
+            peak.routes.append(parse_route(sibling, peak, "Route"))
         else:
             peak.description += sibling.text.strip() + "\n"
 
@@ -303,6 +287,20 @@ def parse_peak(tag: Tag) -> Peak:
     peak.location_description = location_description
 
     return peak
+
+def is_route_has_no_route_prefix(tag):
+    """
+    Returns true if it's a yosemite.html style route without the Route X prefix.
+    <p><i>Kat Walk.</i> Class 4. First ascent September 1929 by Ralph S. Griswold.
+    """
+    # There may be no <i> tag sibling, so catch the AttributeError if it's not
+    # there.
+    try:
+        p = re.compile("^[A-Z].+[^\\.\\)][\\.]")
+        return p.match(tag.i.string) is not None
+
+    except AttributeError:
+        return False
 
 def get_peaks(soup: BeautifulSoup) -> List[Peak]:
     """

@@ -8,6 +8,7 @@ import bs4
 PREFIX="/home/scott/Documents/A_Climbers_Guide/"
 PALISADES = PREFIX + "palisades.html"
 KAWEAHS = PREFIX + "kaweahs_great_western_divide.html"
+YOSEMITE = PREFIX + "yosemite_valley.html"
 
 class TestVersion(unittest.TestCase):
     def test_version(self):
@@ -75,6 +76,29 @@ class TestAlternatePeakNameFormat(unittest.TestCase):
     def test_get_peak_location(self):
         """ Get the peak location as described in the peak name/title. """
         self.assertTrue(self.peak.location_description == "2 W of Mount Stewart")
+
+class TestYosemiteStyleRoutes(unittest.TestCase):
+    """
+    yosemite_valley.html handles routes a bit different, and many routes are
+    simply named rather than using "Route X" as a prefix:
+    <p><i>Higher Cathedral Spire (6,114)</i></p>
+    <p>
+    <i>Southwest face.</i> Maximum class 5.
+    First ascent April 15, 1934, by
+    """
+
+    def setUp(self):
+        self.soup = get_soup(YOSEMITE)
+        self.peaks = get_peaks(self.soup)
+        self.peak = self.peaks[-11]
+
+    def test_get_peaks(self):
+        """ Load a peak from get_peaks(). """
+        self.assertTrue(self.peak.name == "Higher Cathedral Spire")
+
+    def test_a_route(self):
+        """ Try to load a route from an already loaded peak. """
+        self.assertTrue(self.peak.routes[0].name == "Southwest face")
 
 
 if __name__ == '__main__':
