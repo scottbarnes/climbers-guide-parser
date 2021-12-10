@@ -9,30 +9,30 @@ from bs4 import BeautifulSoup, Tag
 
 ### Config ###
 
-INPUT_FILES=[
-    "/home/scott/Documents/A_Climbers_Guide/yosemite_valley.html",
-    # "/home/scott/Documents/A_Climbers_Guide/palisades.html",
-]
-
 # INPUT_FILES=[
-#     "/home/scott/Documents/A_Climbers_Guide/mono_pass_to_pine_creek_pass.html",
-#     "/home/scott/Documents/A_Climbers_Guide/kaweahs_great_western_divide.html",
-#     "/home/scott/Documents/A_Climbers_Guide/palisades_to_kearsarge_pass.html",
-#     "/home/scott/Documents/A_Climbers_Guide/bond_to_tioga_other_peaks.html",
-#     "/home/scott/Documents/A_Climbers_Guide/mammoth_pass_to_mono_pass.html",
-#     "/home/scott/Documents/A_Climbers_Guide/evolution_black_divide.html",
-#     "/home/scott/Documents/A_Climbers_Guide/minarets_ritter_range.html",
-#     "/home/scott/Documents/A_Climbers_Guide/palisades.html",
-#     "/home/scott/Documents/A_Climbers_Guide/kings-kern_divide.html",
-#     "/home/scott/Documents/A_Climbers_Guide/yosemite_valley.html",
-#     "/home/scott/Documents/A_Climbers_Guide/cathedral_range.html",
-#     "/home/scott/Documents/A_Climbers_Guide/mount_humphreys.html",
-#     "/home/scott/Documents/A_Climbers_Guide/sawtooth_ridge.html",
-#     "/home/scott/Documents/A_Climbers_Guide/leconte_divide.html",
-#     "/home/scott/Documents/A_Climbers_Guide/kings_canyon.html",
-#     "/home/scott/Documents/A_Climbers_Guide/clark_range.html",
 #     "/home/scott/Documents/A_Climbers_Guide/whitney.html",
+#     # "/home/scott/Documents/A_Climbers_Guide/palisades.html",
 # ]
+
+INPUT_FILES=[
+    "/home/scott/Documents/A_Climbers_Guide/mono_pass_to_pine_creek_pass.html",
+    "/home/scott/Documents/A_Climbers_Guide/kaweahs_great_western_divide.html",
+    "/home/scott/Documents/A_Climbers_Guide/palisades_to_kearsarge_pass.html",
+    "/home/scott/Documents/A_Climbers_Guide/bond_to_tioga_other_peaks.html",
+    "/home/scott/Documents/A_Climbers_Guide/mammoth_pass_to_mono_pass.html",
+    "/home/scott/Documents/A_Climbers_Guide/evolution_black_divide.html",
+    "/home/scott/Documents/A_Climbers_Guide/minarets_ritter_range.html",
+    "/home/scott/Documents/A_Climbers_Guide/palisades.html",
+    "/home/scott/Documents/A_Climbers_Guide/kings-kern_divide.html",
+    "/home/scott/Documents/A_Climbers_Guide/yosemite_valley.html",
+    "/home/scott/Documents/A_Climbers_Guide/cathedral_range.html",
+    "/home/scott/Documents/A_Climbers_Guide/mount_humphreys.html",
+    "/home/scott/Documents/A_Climbers_Guide/sawtooth_ridge.html",
+    "/home/scott/Documents/A_Climbers_Guide/leconte_divide.html",
+    "/home/scott/Documents/A_Climbers_Guide/kings_canyon.html",
+    "/home/scott/Documents/A_Climbers_Guide/clark_range.html",
+    "/home/scott/Documents/A_Climbers_Guide/whitney.html",
+]
 
 ### End config ###
 
@@ -40,34 +40,11 @@ INPUT_FILES=[
 # Use http://www.highsierratopix.com/high-sierra-map/map.php to help locate passes.
 # Just look at the git repository for the HTML files for any adjustments.
 
-
-# Dataclasses for:
-# regions
-# - intro
-# - the historical resume, topography, approaches & campsites, passes, and peaks for the region
-# historical resume
-# - region
-# topography and its relation to climbing
-# - region
-# approaches and campsites
-# - direction
-# - region
-# principal passes
-# - name
-# - class
-# - elevation
-# - region
-# - description
-# peaks
-# - name
-# - elevation (list?)
-# - routes {set of the routes or whatever}
-# - region
-# routes
-# - route # / name
-# - peak
-# - class
-# - description
+# Output
+# In [40]: for i, p in enumerate(passes):
+#     ...:     with open('output.txt', 'a') as outfile:
+#     ...:         json.dump(asdict(passes[i]), outfile, indent=4)
+#     ...:
 
 @dataclass
 class Region:
