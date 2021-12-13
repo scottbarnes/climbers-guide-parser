@@ -12,7 +12,7 @@ YOSEMITE = PREFIX + "yosemite_valley.html"
 
 class TestVersion(unittest.TestCase):
     def test_version(self):
-        assert __version__ == '0.1.0'
+        assert __version__ == '0.2.0'
 
 class TestSoup(unittest.TestCase):
     """ Verify the soup loads all right. """

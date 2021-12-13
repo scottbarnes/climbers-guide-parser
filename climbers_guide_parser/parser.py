@@ -1,4 +1,5 @@
 import re
+import uuid
 import copy
 # import locale
 import fileinput
@@ -51,16 +52,17 @@ class Region:
     """ Climbing region. Will be own document in DB. """
     name: str
     intro_text: str
+    region_id: uuid.UUID = uuid.uuid4()
 
 placeholder = Region("Pending", "Pending")
 
 @dataclass
 class Pass:
     """ Climbing/hiking pass. Will be own document in DB. """
+    pass_id: uuid.UUID = uuid.uuid4()
     name: str = "Pending"
     aka: list[str] = field(default_factory=list)
     class_rating: str = "Pending"
-    # elevation: str = "Pending"
     elevations: list[str] = field(default_factory=list)
     description: str = "Pending"
     location_description: str = ""
@@ -69,6 +71,7 @@ class Pass:
 @dataclass
 class Route:
     """ Route. Will be own documennt in DB. """
+    route_id: uuid.UUID = uuid.uuid4()
     name: str = "Pending"
     aka: list[str] = field(default_factory=list)
     # peak: Peak = placeholder_peak  # TODO: Circular dependency issue here with peak and route.
@@ -78,6 +81,7 @@ class Route:
 @dataclass
 class Peak:
     """ Peak. Will be own document in DB. """
+    peak_id: uuid.UUID = uuid.uuid4()
     name: str = "Pending"
     aka: list[str] = field(default_factory=list)
     elevations: list[str] = field(default_factory=list)
