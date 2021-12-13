@@ -50,16 +50,16 @@ INPUT_FILES=[
 @dataclass
 class Region:
     """ Climbing region. Will be own document in DB. """
+    region_id: str
     name: str
     intro_text: str
-    region_id: uuid.UUID = uuid.uuid4()
 
-placeholder = Region("Pending", "Pending")
+placeholder = Region("Pending", "Pending", "Pending")
 
 @dataclass
 class Pass:
     """ Climbing/hiking pass. Will be own document in DB. """
-    pass_id: uuid.UUID = uuid.uuid4()
+    pass_id: str
     name: str = "Pending"
     aka: list[str] = field(default_factory=list)
     class_rating: str = "Pending"
@@ -71,7 +71,7 @@ class Pass:
 @dataclass
 class Route:
     """ Route. Will be own documennt in DB. """
-    route_id: uuid.UUID = uuid.uuid4()
+    route_id: str
     name: str = "Pending"
     aka: list[str] = field(default_factory=list)
     # peak: Peak = placeholder_peak  # TODO: Circular dependency issue here with peak and route.
@@ -81,7 +81,7 @@ class Route:
 @dataclass
 class Peak:
     """ Peak. Will be own document in DB. """
-    peak_id: uuid.UUID = uuid.uuid4()
+    peak_id: str
     name: str = "Pending"
     aka: list[str] = field(default_factory=list)
     elevations: list[str] = field(default_factory=list)
@@ -92,7 +92,8 @@ class Peak:
     gps_coordinates: str = ""
     utm_coordinates: str = ""
 
-placeholder_peak = Peak()
+uid = str(uuid.uuid4())
+placeholder_peak = Peak(peak_id=uid)
 
 def get_soup(INPUT_FILE) -> BeautifulSoup:
     """
@@ -122,8 +123,8 @@ def pass_parser(tag: Tag) -> Pass:
     Then use regex and string replacement to extract and remove the class rating,
     leaving only the description text.
     """
-
-    mountain_pass = Pass()
+    uid = str(uuid.uuid4())
+    mountain_pass = Pass(pass_id=uid)
     # elevations = List[str]
     name = ""
     location_description = ""
@@ -204,7 +205,8 @@ def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
     TODO: Circular dependency here with peak referencing the route, and the
     route referecing the peak.
     """
-    route = Route()
+    uid = str(uuid.uuid4())
+    route = Route(route_id=uid)
 
     # If wanting to remove "Route X" prefix, could do it here by splitting on "." after extraction.
     if kind == "Route":
@@ -235,7 +237,8 @@ def parse_peak(tag: Tag) -> Peak:
 
     Finally, if it's a 'yosemite.html' route description, that's parsed also.
     """
-    peak = Peak()
+    uid = str(uuid.uuid4())
+    peak = Peak(peak_id=uid)
     name, elevations, location_description = get_name_elevation_and_description(tag)
 
     # For each peak, go through and process the peak name, elevation(s),
