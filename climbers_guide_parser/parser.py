@@ -3,6 +3,7 @@ import uuid
 import copy
 # import locale
 import fileinput
+from slugify import slugify
 from dataclasses import dataclass, field
 from typing import List
 import sys
@@ -66,23 +67,25 @@ class Pass:
     elevations: list[str] = field(default_factory=list)
     description: str = "Pending"
     location_description: str = ""
+    slug: str = ""
     # region: Region = placeholder
 
 @dataclass
 class Route:
     """ Route. Will be own documennt in DB. """
     route_id: str
-    name: str = "Pending"
+    name: str = ""
     aka: list[str] = field(default_factory=list)
     # peak: Peak = placeholder_peak  # TODO: Circular dependency issue here with peak and route.
-    class_rating: str = "Pending"
-    description: str = "Pending"
+    class_rating: str = ""
+    description: str = ""
+    slug: str = ""
 
 @dataclass
 class Peak:
     """ Peak. Will be own document in DB. """
     peak_id: str
-    name: str = "Pending"
+    name: str = ""
     aka: list[str] = field(default_factory=list)
     elevations: list[str] = field(default_factory=list)
     routes: list[Route] = field(default_factory=list)
@@ -91,6 +94,7 @@ class Peak:
     location_description: str = ""
     gps_coordinates: str = ""
     utm_coordinates: str = ""
+    slug: str = ""
 
 uid = str(uuid.uuid4())
 placeholder_peak = Peak(peak_id=uid)
@@ -139,6 +143,7 @@ def pass_parser(tag: Tag) -> Pass:
     mountain_pass.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
     mountain_pass.description = tag.text.split(".", 1)[1].strip()
     mountain_pass.location_description = location_description
+    mountain_pass.slug = slugify(f'{mountain_pass.name} {mountain_pass.pass_id.split("-")[-1]}')
 
     return mountain_pass
 
@@ -216,6 +221,7 @@ def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
 
     route.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
     route.description = tag.text.split(".", 1)[1].strip()
+    route.slug = slugify(f'{route.name} {route.route_id.split("-")[-1]}')
     # route.peak = peak
 
     return route
@@ -269,6 +275,7 @@ def parse_peak(tag: Tag) -> Peak:
     peak.name = name
     peak.elevations = elevations
     peak.location_description = location_description
+    peak.slug = slugify(f'{peak.name} {peak.peak_id.split("-")[-1]}')
 
     return peak
 
