@@ -1,7 +1,7 @@
 import unittest
 
 from climbers_guide_parser import __version__
-from climbers_guide_parser import get_soup, get_peaks
+from climbers_guide_parser import get_soup, get_peaks, get_region, get_passes
 import bs4
 
 # Constants
@@ -99,6 +99,26 @@ class TestYosemiteStyleRoutes(unittest.TestCase):
     def test_a_route(self):
         """ Try to load a route from an already loaded peak. """
         self.assertTrue(self.peak.routes[0].name == "Southwest face")
+
+
+class TestRegions(unittest.TestCase):
+    """
+    Test some regions.
+    """
+    def setUp(self):
+        self.soup = get_soup(YOSEMITE)
+        self.peaks = get_peaks(self.soup)
+        self.passes = get_passes(self.soup)
+        self.region = get_region(self.soup, self.peaks, self.passes)
+        self.peak = self.peaks[-11]
+
+    def test_get_region_name(self):
+        """ Get the region name. """
+        self.assertTrue(self.region.name == "Yosemite Valley")
+
+    def test_get_peak_region(self):
+        """ Get the region from one of this region's peaks. """
+        self.assertTrue(self.peak.region == "Yosemite Valley")
 
 
 if __name__ == '__main__':

@@ -3,11 +3,12 @@ import uuid
 import copy
 # import locale
 import fileinput
+import json
 from slugify import slugify
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import List
 import sys
-from bs4 import BeautifulSoup, Tag
+from bs4 import Comment, BeautifulSoup, Tag
 
 ### Config ###
 
@@ -48,14 +49,7 @@ INPUT_FILES=[
 #     ...:         json.dump(asdict(passes[i]), outfile, indent=4)
 #     ...:
 
-@dataclass
-class Region:
-    """ Climbing region. Will be own document in DB. """
-    region_id: str
-    name: str
-    intro_text: str
-
-placeholder = Region("Pending", "Pending", "Pending")
+# placeholder = Region("Pending", "Pending", "Pending")
 
 @dataclass
 class Pass:
@@ -68,6 +62,8 @@ class Pass:
     description: str = "Pending"
     location_description: str = ""
     slug: str = ""
+    region: str = ""
+    region_slug: str = ""
     # region: Region = placeholder
 
 @dataclass
@@ -95,6 +91,19 @@ class Peak:
     gps_coordinates: str = ""
     utm_coordinates: str = ""
     slug: str = ""
+    region: str = ""
+    region_slug: str = ""
+
+@dataclass
+class Region:
+    """ Climbing region. Will be own document in DB. """
+    region_id: str
+    name: str
+    # intro_text: str
+    peaks: list[Peak] = field(default_factory=list)
+    passes: list[Pass] = field(default_factory=list)
+    slug: str = ""
+
 
 uid = str(uuid.uuid4())
 placeholder_peak = Peak(peak_id=uid)
@@ -310,16 +319,77 @@ def get_peaks(soup: BeautifulSoup) -> List[Peak]:
 
     return parsed_peaks
 
-def do_peaks():
+def parse_region(soup: BeautifulSoup) -> str:
+    """
+    Parse the soup, get the region, and return it.
+    """
+    title_string = ""
+
+    title = soup.find("i", string=re.compile(r"Sierra"))
+    if title:
+        region = title.find_next("h3")
+
+        if region:
+            title_string = region.text
+
+    return title_string
+
+def get_region(soup: BeautifulSoup, peaks: list[Peak], passes: list[Pass]) -> Region:
+    """
+    Get the region, then go through already parsed peaks and passes and add them to the region.
+    """
+
+    title_string = parse_region(soup)
+
+    # return "no region"
+    uid = str(uuid.uuid4())
+    region = Region(name=title_string, region_id=uid)
+    region.slug = slugify(f'{region.name} {region.region_id.split("-")[-1]}')
+
+    # Add the peaks and passes to the region, and the region to the peaks and
+    # the passes.
+    for peak in peaks:
+        region.peaks.append(peak)
+        peak.region = region.name
+        peak.region_slug = region.slug
+
+    for mountain_pass in passes:
+        region.passes.append(mountain_pass)
+        mountain_pass.region = region.name
+        mountain_pass.region_slug = region.slug
+
+    return region
+
+def do_peaks_passes_regions() -> tuple[list[Peak], list[Pass], list[Region]]:
     """
     Iterate through the book and run the scripts on each input.
     """
     peaks = []
     passes = []
+    regions = []
 
     for file in INPUT_FILES:
         soup = get_soup(file)
         peaks += get_peaks(soup)
         passes += get_passes(soup)
+        regions.append(get_region(soup, peaks, passes))
 
-    return peaks, passes
+    return peaks, passes, regions
+
+
+def write_json(input: list, type: str):
+    """ Write out json to a set of files. """
+    output = []
+    for e in input:
+        output.append(asdict(e))
+
+    with open(f"output-{type}.json", "a") as outfile:
+        json.dump(output, outfile, indent=4)
+
+def get_json():
+    """ Write out the json files. """
+    peaks, passes, regions = do_peaks_passes_regions()
+    write_json(peaks, "peaks")
+    write_json(passes, "passes")
+    write_json(regions, "regions")
+
