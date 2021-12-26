@@ -34,7 +34,8 @@ class TestPeakAndRoute(unittest.TestCase):
 
     def setUp(self):
         self.soup = get_soup(PALISADES)
-        self.peaks = get_peaks(self.soup)
+        self.region = get_region(self.soup)
+        self.peaks, self.region = get_peaks(self.soup, self.region)
         self.peak2 = self.peaks[8]
 
     def test_get_peak_name(self):
@@ -66,7 +67,8 @@ class TestAlternatePeakNameFormat(unittest.TestCase):
     """
     def setUp(self):
         self.soup = get_soup(KAWEAHS)
-        self.peaks = get_peaks(self.soup)
+        self.region = get_region(self.soup)
+        self.peaks, self.region = get_peaks(self.soup, self.region)
         self.peak = self.peaks[-5]
 
     def test_get_peaks(self):
@@ -89,7 +91,8 @@ class TestYosemiteStyleRoutes(unittest.TestCase):
 
     def setUp(self):
         self.soup = get_soup(YOSEMITE)
-        self.peaks = get_peaks(self.soup)
+        self.region = get_region(self.soup)
+        self.peaks, self.region = get_peaks(self.soup, self.region)
         self.peak = self.peaks[-11]
 
     def test_get_peaks(self):
@@ -107,9 +110,10 @@ class TestRegions(unittest.TestCase):
     """
     def setUp(self):
         self.soup = get_soup(YOSEMITE)
-        self.peaks = get_peaks(self.soup)
-        self.passes = get_passes(self.soup)
+        self.soup_with_passes = get_soup(PALISADES)
         self.region = get_region(self.soup)
+        self.peaks, self.region = get_peaks(self.soup, self.region)
+        self.passes = get_passes(self.soup_with_passes, self.region)
 
     def test_get_region_name(self):
         """ Get the region name. """
@@ -122,6 +126,10 @@ class TestRegions(unittest.TestCase):
     def test_peak_name_in_region(self):
         """ Get a peak's name from within the region list. """
         self.assertTrue(self.region.peaks[18].name == "Washington Column")
+
+    def test_pass_name_in_region(self):
+        """ Get a pass's name from within thte region list. """
+        self.assertTrue(self.region.passes[1].name == "Jigsaw Pass")
 
 
 if __name__ == '__main__':
