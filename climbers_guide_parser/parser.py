@@ -334,7 +334,7 @@ def parse_region(soup: BeautifulSoup) -> str:
 
     return title_string
 
-def get_region(soup: BeautifulSoup, peaks: list[Peak], passes: list[Pass]) -> Region:
+def get_region(soup: BeautifulSoup) -> Region:
     """
     Get the region, then go through already parsed peaks and passes and add them to the region.
     """
@@ -348,12 +348,12 @@ def get_region(soup: BeautifulSoup, peaks: list[Peak], passes: list[Pass]) -> Re
 
     # Add the peaks and passes to the region, and the region to the peaks and
     # the passes.
-    for peak in peaks:
+    for peak in get_peaks(soup):
         region.peaks.append(peak)
         peak.region = region.name
         peak.region_slug = region.slug
 
-    for mountain_pass in passes:
+    for mountain_pass in get_passes(soup):
         region.passes.append(mountain_pass)
         mountain_pass.region = region.name
         mountain_pass.region_slug = region.slug
@@ -372,7 +372,7 @@ def do_peaks_passes_regions() -> tuple[list[Peak], list[Pass], list[Region]]:
         soup = get_soup(file)
         peaks += get_peaks(soup)
         passes += get_passes(soup)
-        regions.append(get_region(soup, peaks, passes))
+        regions.append(get_region(soup))
 
     return peaks, passes, regions
 
