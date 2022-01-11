@@ -7,7 +7,7 @@ authors = ["Scott Barnes <scottreidbarnes@gmail.com>"]
 [tool.poetry.dependencies]
 python = "^3.10.0"
 beautifulsoup4 = "^4.10.0"
-lxml = "^4.6.4"
+lxml = "^4.6.5"
 python-slugify = "^5.0.2"
 
 [tool.poetry.dev-dependencies]
