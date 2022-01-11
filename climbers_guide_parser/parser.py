@@ -1,14 +1,16 @@
-import re
-import uuid
 import copy
+
 # import locale
 import fileinput
 import json
-from slugify import slugify
+import re
+import sys
+import uuid
 from dataclasses import asdict, dataclass, field
 from typing import List
-import sys
-from bs4 import Comment, BeautifulSoup, Tag
+
+from bs4 import BeautifulSoup, Comment, Tag
+from slugify import slugify
 
 ### Config ###
 
@@ -17,7 +19,7 @@ from bs4 import Comment, BeautifulSoup, Tag
 #     # "/home/scott/Documents/A_Climbers_Guide/palisades.html",
 # ]
 
-INPUT_FILES=[
+INPUT_FILES = [
     "/home/scott/Documents/A_Climbers_Guide/mono_pass_to_pine_creek_pass.html",
     "/home/scott/Documents/A_Climbers_Guide/kaweahs_great_western_divide.html",
     "/home/scott/Documents/A_Climbers_Guide/palisades_to_kearsarge_pass.html",
@@ -51,9 +53,11 @@ INPUT_FILES=[
 
 # placeholder = Region("Pending", "Pending", "Pending")
 
+
 @dataclass
 class Pass:
-    """ Climbing/hiking pass. Will be own document in DB. """
+    """Climbing/hiking pass. Will be own document in DB."""
+
     pass_id: str
     name: str = "Pending"
     aka: list[str] = field(default_factory=list)
@@ -66,9 +70,11 @@ class Pass:
     region_slug: str = ""
     # region: Region = placeholder
 
+
 @dataclass
 class Route:
-    """ Route. Will be own documennt in DB. """
+    """Route. Will be own documennt in DB."""
+
     route_id: str
     name: str = ""
     aka: list[str] = field(default_factory=list)
@@ -77,9 +83,11 @@ class Route:
     description: str = ""
     slug: str = ""
 
+
 @dataclass
 class Peak:
-    """ Peak. Will be own document in DB. """
+    """Peak. Will be own document in DB."""
+
     peak_id: str
     name: str = ""
     aka: list[str] = field(default_factory=list)
@@ -94,9 +102,11 @@ class Peak:
     region: str = ""
     region_slug: str = ""
 
+
 @dataclass
 class Region:
-    """ Climbing region. Will be own document in DB. """
+    """Climbing region. Will be own document in DB."""
+
     region_id: str
     name: str
     # intro_text: str
@@ -108,13 +118,14 @@ class Region:
 uid = str(uuid.uuid4())
 placeholder_peak = Peak(peak_id=uid)
 
+
 def get_soup(INPUT_FILE) -> BeautifulSoup:
     """
     Parse the book chapter and return it as an object, after parsing it as
     a string to make navigation easier later.
     """
-    with open(INPUT_FILE, encoding='windows-1252') as file:  # encoding is not ISO.
-        soup = BeautifulSoup(file, 'lxml')
+    with open(INPUT_FILE, encoding="windows-1252") as file:  # encoding is not ISO.
+        soup = BeautifulSoup(file, "lxml")
 
     # Remove all links
     links = soup.find_all("a")
@@ -122,11 +133,12 @@ def get_soup(INPUT_FILE) -> BeautifulSoup:
         # link.extract()
         link.decompose()
     soup = str(soup)
-    soup = soup.replace('<p><i>', '<p class="peak"><i>')  # <p><i> is only peaks to <p><i>References
-    soup = soup.replace('\n', ' ')  # The string process adds a lot of "\n".
-    soup = BeautifulSoup(soup, 'lxml')
+    soup = soup.replace("<p><i>", '<p class="peak"><i>')  # <p><i> is only peaks to <p><i>References
+    soup = soup.replace("\n", " ")  # The string process adds a lot of "\n".
+    soup = BeautifulSoup(soup, "lxml")
 
     return soup
+
 
 def pass_parser(tag: Tag, region: Region) -> Pass:
     """
@@ -161,6 +173,7 @@ def pass_parser(tag: Tag, region: Region) -> Pass:
 
     return mountain_pass
 
+
 def get_passes(soup: BeautifulSoup, region: Region) -> List:
     """
     Parse the soup and return a list of pass dataclasses.
@@ -184,6 +197,7 @@ def get_passes(soup: BeautifulSoup, region: Region) -> List:
 
     return passes
 
+
 def get_name_elevation_and_description(tag: Tag) -> tuple[str, List[str], str]:
     """
     Parse a tag to extract the name, elevation, and location description. Return it as a
@@ -198,12 +212,13 @@ def get_name_elevation_and_description(tag: Tag) -> tuple[str, List[str], str]:
     elevations = [e.strip(".,)( ") for e in elevations.split(";")]  # split on ";" and strip each.
     # Get narrative location descriptions (e.g 0.6 NE of Mount Morgan) and remove it from
     # the list of elevations.
-    p = re.compile('\\d\\s[NEWS]')
+    p = re.compile("\\d\\s[NEWS]")
     for i, e in enumerate(elevations):
         if p.search(e):
             location_description = elevations.pop(i)
 
     return (name, elevations, location_description)
+
 
 def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
     """
@@ -229,7 +244,7 @@ def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
 
     # If wanting to remove "Route X" prefix, could do it here by splitting on "." after extraction.
     if kind == "Route":
-        route.name = tag.i.extract().string.strip(" .,")          # Removes <i></i> and returns contents.
+        route.name = tag.i.extract().string.strip(" .,")  # Removes <i></i> and returns contents.
     elif kind == "Class":
         route.name = "Route 1"  # This is the only included route for the peak.
 
@@ -238,6 +253,7 @@ def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
     route.slug = slugify(f'{route.name} {route.route_id.split("-")[-1]}')
 
     return route
+
 
 def parse_peak(tag: Tag, region: Region) -> Peak:
     """
@@ -294,6 +310,7 @@ def parse_peak(tag: Tag, region: Region) -> Peak:
 
     return peak
 
+
 def is_route_has_no_route_prefix(tag):
     """
     Returns true if it's a yosemite.html style route without the Route X prefix.
@@ -307,6 +324,7 @@ def is_route_has_no_route_prefix(tag):
 
     except AttributeError:
         return False
+
 
 def get_peaks(soup: BeautifulSoup, region: Region) -> tuple[List[Peak], Region]:
     """
@@ -328,6 +346,7 @@ def get_peaks(soup: BeautifulSoup, region: Region) -> tuple[List[Peak], Region]:
 
     return parsed_peaks, region
 
+
 def parse_region(soup: BeautifulSoup) -> str:
     """
     Parse the soup, get the region, and return it.
@@ -343,6 +362,7 @@ def parse_region(soup: BeautifulSoup) -> str:
 
     return title_string
 
+
 def get_region(soup: BeautifulSoup) -> Region:
     """
     Get the region and return it.
@@ -356,6 +376,7 @@ def get_region(soup: BeautifulSoup) -> Region:
     region.slug = slugify(f'{region.name} {region.region_id.split("-")[-1]}')
 
     return region
+
 
 def do_peaks_passes_regions() -> tuple[list[Peak], list[Pass], list[Region]]:
     """
@@ -377,7 +398,7 @@ def do_peaks_passes_regions() -> tuple[list[Peak], list[Pass], list[Region]]:
 
 
 def write_json(i: list, type: str):
-    """ Write out json to a set of files. """
+    """Write out json to a set of files."""
     output = []
     for e in i:
         output.append(asdict(e))
@@ -385,10 +406,10 @@ def write_json(i: list, type: str):
     with open(f"output-{type}.json", "a") as outfile:
         json.dump(output, outfile, indent=4)
 
+
 def get_json():
-    """ Write out the json files. """
+    """Write out the json files."""
     peaks, passes, regions = do_peaks_passes_regions()
     write_json(peaks, "peaks")
     write_json(passes, "passes")
     write_json(regions, "regions")
-
