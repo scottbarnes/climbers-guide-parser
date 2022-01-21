@@ -6,6 +6,7 @@ import json
 import re
 import sys
 import uuid
+from datetime import datetime
 from dataclasses import asdict, dataclass, field
 from typing import List
 
@@ -58,6 +59,8 @@ INPUT_FILES = [
 class Pass:
     """Climbing/hiking pass. Will be own document in DB."""
 
+    created: str
+    last_modified: str
     pass_id: str
     name: str = "Pending"
     aka: list[str] = field(default_factory=list)
@@ -75,6 +78,8 @@ class Pass:
 class Route:
     """Route. Will be own documennt in DB."""
 
+    created: str
+    last_modified: str
     route_id: str
     name: str = ""
     aka: list[str] = field(default_factory=list)
@@ -88,6 +93,8 @@ class Route:
 class Peak:
     """Peak. Will be own document in DB."""
 
+    created: str
+    last_modified: str
     peak_id: str
     name: str = ""
     aka: list[str] = field(default_factory=list)
@@ -107,6 +114,8 @@ class Peak:
 class Region:
     """Climbing region. Will be own document in DB."""
 
+    created: str
+    last_modified: str
     region_id: str
     name: str
     # intro_text: str
@@ -115,8 +124,8 @@ class Region:
     slug: str = ""
 
 
-uid = str(uuid.uuid4())
-placeholder_peak = Peak(peak_id=uid)
+# uid = str(uuid.uuid4())
+# placeholder_peak = Peak(peak_id=uid)
 
 
 def get_soup(INPUT_FILE) -> BeautifulSoup:
@@ -149,7 +158,8 @@ def pass_parser(tag: Tag, region: Region) -> Pass:
     leaving only the description text.
     """
     uid = str(uuid.uuid4())
-    mountain_pass = Pass(pass_id=uid)
+    mountain_pass = Pass(pass_id=uid, created=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                         last_modified=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'))
     # elevations = List[str]
     name = ""
     location_description = ""
@@ -240,7 +250,8 @@ def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
     route referecing the peak.
     """
     uid = str(uuid.uuid4())
-    route = Route(route_id=uid)
+    route = Route(route_id=uid, created=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                  last_modified=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'))
 
     # If wanting to remove "Route X" prefix, could do it here by splitting on "." after extraction.
     if kind == "Route":
@@ -273,7 +284,8 @@ def parse_peak(tag: Tag, region: Region) -> Peak:
     Finally, if it's a 'yosemite.html' route description, that's parsed also.
     """
     uid = str(uuid.uuid4())
-    peak = Peak(peak_id=uid)
+    peak = Peak(peak_id=uid, created=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                last_modified=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'))
     name, elevations, location_description = get_name_elevation_and_description(tag)
 
     # For each peak, go through and process the peak name, elevation(s),
@@ -372,7 +384,8 @@ def get_region(soup: BeautifulSoup) -> Region:
 
     # return "no region"
     uid = str(uuid.uuid4())
-    region = Region(name=title_string, region_id=uid)
+    region = Region(name=title_string, region_id=uid, created=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                    last_modified=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'))
     region.slug = slugify(f'{region.name} {region.region_id.split("-")[-1]}')
 
     return region
@@ -404,7 +417,7 @@ def write_json(i: list, type: str):
         output.append(asdict(e))
 
     with open(f"output-{type}.json", "a") as outfile:
-        json.dump(output, outfile, indent=4)
+        json.dump(output, outfile, indent=4, default=str, sort_keys=True)
 
 
 def get_json():
