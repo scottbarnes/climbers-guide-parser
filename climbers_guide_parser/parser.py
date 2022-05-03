@@ -1,19 +1,24 @@
-import copy
-
-# import locale
-import fileinput
 import json
 import re
-import sys
+# import sys
 import uuid
 from datetime import datetime
 from dataclasses import asdict, dataclass, field
 from typing import List
 
-from bs4 import BeautifulSoup, Comment, Tag
-from slugify import slugify
+from bs4 import BeautifulSoup, Tag # type: ignore
+from slugify import slugify # type: ignore
+import click # type: ignore
+from sqlalchemy.orm import sessionmaker # type: ignore
+
+from .database import Base, DB # type: ignore
+from .models import PeakModel, RouteModel, RegionModel, PassModel # type: ignore
 
 ### Config ###
+
+DBTYPE = 'sqlite'
+# DBNAME = ':memory:'  # Store in memory, for testing.
+DBNAME = 'babble.sqlite'  # Filename for sqlite db.
 
 # INPUT_FILES=[
 #     "/home/scott/Documents/A_Climbers_Guide/whitney.html",
@@ -71,7 +76,6 @@ class Pass:
     slug: str = ""
     region: str = ""
     region_slug: str = ""
-    # region: Region = placeholder
 
 
 @dataclass
@@ -83,7 +87,7 @@ class Route:
     route_id: str
     name: str = ""
     aka: list[str] = field(default_factory=list)
-    # peak: Peak = placeholder_peak  # TODO: Circular dependency issue here with peak and route.
+    # peak: Peak = placeholder_peak  # Circular dependency; set after creation.
     class_rating: str = ""
     description: str = ""
     slug: str = ""
@@ -122,10 +126,6 @@ class Region:
     peaks: list[Peak] = field(default_factory=list)
     passes: list[Pass] = field(default_factory=list)
     slug: str = ""
-
-
-# uid = str(uuid.uuid4())
-# placeholder_peak = Peak(peak_id=uid)
 
 
 def get_soup(INPUT_FILE) -> BeautifulSoup:
@@ -184,26 +184,28 @@ def pass_parser(tag: Tag, region: Region) -> Pass:
     return mountain_pass
 
 
-def get_passes(soup: BeautifulSoup, region: Region) -> List:
+def get_passes(soup: BeautifulSoup, region: Region) -> List[Pass]:
     """
     Parse the soup and return a list of pass dataclasses.
     """
-    passes = []
-    pass_section_start: Tag = soup.find("h4", string=re.compile(r"passes", re.IGNORECASE))
-    # All the <p> tags are passes, and <h4> ends the section.
-    # Use 'try' to catch when there are no passes in the file.
-    try:
-        for sibling in pass_section_start.next_siblings:
-            if sibling.name == "p":
-                p = pass_parser(sibling, region)
-                # Don't add non-passes.
-                if "References" in p.name or "Photographs" in p.name:
-                    continue
-                passes.append(p)
-            elif sibling.name == "h4":
-                break
-    except AttributeError:
-        return passes
+    passes: List[Pass] = []
+    pass_section_start = soup.find("h4", string=re.compile(r"passes", re.IGNORECASE))
+
+    # All the <p> tags (after the start) contain passes, and <h4> ends the section.
+    # When the <h4> tag is found, we're done.
+    if not isinstance(pass_section_start, Tag):
+        return passes  # Some regions have no passes, so bail out.
+
+    for sibling in pass_section_start.next_siblings:
+        # if sibling.name == "p":
+        if isinstance(sibling, Tag) and sibling.name == "p":
+            p = pass_parser(sibling, region)
+            # Don't add non-passes.
+            if "References" in p.name or "Photographs" in p.name:
+                continue
+            passes.append(p)
+        elif isinstance(sibling, Tag) and sibling.name == "h4":
+            break
 
     return passes
 
@@ -254,14 +256,19 @@ def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
                   last_modified=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'))
 
     # If wanting to remove "Route X" prefix, could do it here by splitting on "." after extraction.
-    if kind == "Route":
-        route.name = tag.i.extract().string.strip(" .,")  # Removes <i></i> and returns contents.
+    if kind == "Route" and tag.i:
+        parsed_route_name = tag.i.extract().string
+        if parsed_route_name:
+            route.name = parsed_route_name.strip(" .,") # Removes <i></i> and returns contents.
     elif kind == "Class":
         route.name = "Route 1"  # This is the only included route for the peak.
 
     route.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
     route.description = tag.text.split(".", 1)[1].strip()
     route.slug = slugify(f'{route.name} {route.route_id.split("-")[-1]}')
+    # This can't be typed on the class because of circular dependecies with
+    # Peak and Route when defining them.
+    route.peak: Peak = peak # type: ignore
 
     return route
 
@@ -410,19 +417,140 @@ def do_peaks_passes_regions() -> tuple[list[Peak], list[Pass], list[Region]]:
     return peaks, passes, regions
 
 
-def write_json(i: list, type: str):
+def write_json(i: list, kind: str):
     """Write out json to a set of files."""
     output = []
     for e in i:
         output.append(asdict(e))
 
-    with open(f"output-{type}.json", "a") as outfile:
+    with open(f"output-{kind}.json", "a") as outfile:
         json.dump(output, outfile, indent=4, default=str, sort_keys=True)
 
 
-def get_json():
-    """Write out the json files."""
+def output_json():
+    """ Parse and output to JSON """
     peaks, passes, regions = do_peaks_passes_regions()
     write_json(peaks, "peaks")
     write_json(passes, "passes")
     write_json(regions, "regions")
+    click.echo("JSON files written to the current directory.")
+
+def output_sqlite():
+    """ Parse output to SQLite """
+
+    # Set up database.
+    engine = DB(dbtype=DBTYPE, dbname=DBNAME).create_db_engine()
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    # Get the peak, passes, and regions, though in a way just the regions are
+    # used.
+    peaks, passes, regions = do_peaks_passes_regions()
+
+    # For each region, process all peaks and passes.
+    for region in regions:
+        r = RegionModel(
+            name=region.name,
+            slug=region.slug,
+            region_id=region.region_id,
+            created=datetime.now(),
+            last_modified=datetime.now(),
+        )
+
+        # Process each peak in the region.
+        for peak in region.peaks:
+            p = PeakModel(
+                created=datetime.now(),
+                last_modified=datetime.now(),
+                peak_id=peak.peak_id,
+                name=peak.name,
+                aka=peak.aka,
+                elevations=peak.elevations,
+                description=peak.description,
+                location_description=peak.location_description,
+                gps_coordinates=peak.gps_coordinates,
+                utm_coordinates=peak.utm_coordinates,
+                slug=peak.slug,
+                # This probably needs to get the already created specific region
+                # and then to work with that.
+                # region_id=r,
+                # region_slug=peak.region_slug,
+            )
+
+            # Append this peak to its region.
+            r.peaks.append(p)
+
+            # For each route on the peak, add it to the list via the peak's
+            # routes, so that the relation between the two is set.
+            for route in peak.routes:
+                rte = RouteModel(
+                    name=route.name,
+                    aka=route.aka,
+                    class_rating=route.class_rating,
+                    description=route.description,
+                    route_id=route.route_id
+                )
+                # Add the route to the peak.
+                p.routes.append(rte)
+
+            # With Peak constructed and the routes added, add the peak.
+            session.add(p)
+
+        # Process each pass in the region.
+        for mountain_pass in region.passes:
+            p = PassModel(
+                created=datetime.now(),
+                last_modified=datetime.now(),
+                pass_id=mountain_pass.pass_id,
+                class_rating=mountain_pass.class_rating,
+                description=mountain_pass.description,
+                name=mountain_pass.name,
+                slug=mountain_pass.slug,
+            )
+            r.passes.append(p)
+            session.add(p)
+
+        # Add the region
+        print(f"Processing {region.name}\n")
+        session.add(r)
+    # Save the database changes.
+    session.commit()
+
+    first_peak = session.query(PeakModel).first()
+    last_peak = session.query(PeakModel).order_by(PeakModel.id.desc())[2]
+    print(f"Fetching the first peak:\n{first_peak}")
+    print(f"Fetching the third from the last peak:\n{last_peak}")
+    print(f"\nShowing more data about {last_peak.name}\n \
+          id: {last_peak.id}\n \
+          created: {last_peak.created}\n \
+          last_modified: {last_peak.last_modified}\n \
+          peak_id: {last_peak.peak_id}\n \
+          aka: {last_peak.aka}\n \
+          elevations: {last_peak.elevations}\n \
+          description: {last_peak.description}\n \
+          location_description: {last_peak.location_description}\n \
+          gps_coordinates: {last_peak.gps_coordinates}\n \
+          utm_coordinates: {last_peak.utm_coordinates}\n \
+          slug: {last_peak.slug}\n \
+          region: {last_peak.region}\n \
+          routes: {last_peak.routes}\n \
+          ")
+
+    regions_db = session.query(RegionModel).all()
+    print(f"Regions are: {regions_db}\n")
+    print(f"First region and peak are: {regions_db[0].peaks[0]}\n")
+    print(f"First region and pass are: {regions_db[0].passes[0]}\n")
+
+
+@click.command(no_args_is_help=True)
+@click.option("-j", "--json", is_flag=True, help="Write to 'output-[kind].json'")
+# @click.option("-s", "--sqlite", type=click.File(), help="Write to SQLite DB at path")
+@click.option("-s", "--sqlite", is_flag=True, help="Write to SQLite DB at path")
+def main(json, sqlite):
+    """ Parse A Climber's Guide to the High Sierra HTML files and output them
+    as desired. """
+    if json:
+        return output_json()
+    elif sqlite:
+        return output_sqlite()
