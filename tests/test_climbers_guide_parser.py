@@ -146,7 +146,7 @@ class TestRegions(unittest.TestCase):
         self.assertTrue(self.region.peaks[18].name == "Washington Column")
 
     def test_pass_name_in_region(self):
-        """Get a pass's name from within thte region list."""
+        """Get a pass's name from within the region list."""
         self.assertTrue(self.region.passes[1].name == "Jigsaw Pass")
 
 
