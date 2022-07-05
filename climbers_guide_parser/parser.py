@@ -266,7 +266,7 @@ def parse_route(tag: Tag, peak: Peak, kind: str) -> Route:
     route.class_rating = tag.text.split(".")[0].strip()  # Returns "Class 1", above.
     route.description = tag.text.split(".", 1)[1].strip()
     route.slug = slugify(f'{route.name} {route.route_id.split("-")[-1]}')
-    # This can't be typed on the class because of circular dependecies with
+    # This can't be typed on the class because of circular dependencies with
     # Peak and Route when defining them.
     route.peak: Peak = peak # type: ignore
 
